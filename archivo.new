@@ -1,0 +1,16 @@
+datos que necesito
+query, filtros, IDs
+
+
+busqueda
+    query str
+    filtro dict con dos keys - filtro_id y valor_id
+    IDs set de str
+
+
+busqueda = {
+
+    'query': 'jueguera masticadora'
+    'filtro': {'filtro_id': 'discount', 'valor_id':'40-100' }
+    'ID': set(IDs)         
+}
