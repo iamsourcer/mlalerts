@@ -3,7 +3,7 @@
 import json
 import math
 import pickle
-import argparse
+import sys
 import os
 import requests
 
@@ -101,7 +101,8 @@ def select_query() -> str:
     while True:
         i = 0
         for search in saved_searches:
-            search = search.split('.')[0]
+            search = search.replace('_', ' ').replace('.pickle', '')
+
             print('[{}] - {}'.format(i, search))
             i += 1
         numero_valor = input_numero('>> ', len(saved_searches))
@@ -144,19 +145,12 @@ def main(query):
     pickle.dump(search, open(pickle_filename, 'wb'))
 
 if __name__ == '__main__':
+    q = ' '.join(sys.argv[1:])
+    if not q:
+        q = select_query()
+    if q:
+        main(q)
 
-    my_parser = argparse.ArgumentParser()
-    my_parser.add_argument('--query', '-q',
-                           nargs='+',
-                           help='query search')
-    args = my_parser.parse_args()
-    if args.query:
-        query = ' '.join(args.query)
-        main(query)
-    else:
-        query = select_query()
-        if query is not None:
-            main(query)
-
+#
 # TODO mejorar la salida de las opciones que quedan desalineadas.
 # TODO mostrar la cantidad de publicaciones en cada paso
