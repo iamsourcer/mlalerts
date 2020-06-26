@@ -50,6 +50,8 @@ def input_numero(prompt: str, maximo: int) -> int:
         return None
     while not es_numero(entrada, maximo):
         entrada = input(prompt)
+        if not entrada:
+            return None
     return int(entrada)
 
 def select_filters(q: str) -> dict:
@@ -61,7 +63,10 @@ def select_filters(q: str) -> dict:
 
     while True:
         i = 0
-        filtros = __get(search)['available_filters']
+        data  = __get(search)
+        filtros = data['available_filters']
+        total_results = data['paging']['total']
+        print('Total listings:{}'.format(total_results))
 
         for filtro in filtros:
             print('[{}] - {}'.format(i, filtro['name']))
@@ -86,24 +91,25 @@ def select_filters(q: str) -> dict:
     return search
 
 def select_query() -> str:
+    if not os.path.exists('searches'):
+        os.mkdir('searches')
     saved_searches = os.listdir('searches')
-    if not len(saved_searches) >= 1:
-        print('No previous search done - Go back and query something!')
+    if len(saved_searches) == 0 :
+        print('No previous search done - Go back and query something using --query!')
         return None
-    print('Wanna Go back to these ??\n')
+    print('Wanna Go back to these ?? - Enter to EXIT\n')
     while True:
         i = 0
         for search in saved_searches:
+            search = search.split('.')[0]
             print('[{}] - {}'.format(i, search))
             i += 1
         numero_valor = input_numero('>> ', len(saved_searches))
 
         if numero_valor is None:
             return None
-
-        if numero_valor is not None:
-            query = saved_searches[int(numero_valor)]
-            break
+        query = saved_searches[numero_valor].split('.')[0]
+        break
     return query
 
 def main(query):
@@ -139,18 +145,17 @@ def main(query):
 if __name__ == '__main__':
 
     my_parser = argparse.ArgumentParser()
-    my_parser.add_argument('--query',
+    my_parser.add_argument('--query', '-q',
+                           nargs='+',
                            help= 'query search')
     args = my_parser.parse_args()
     if args.query:
-        main(args.query)
+        query = ' '.join(args.query)
+        main(query)
     else:
         query = select_query()
         if query is not None:
             main(query)
 
-# TODO
-# agregar un parametro como nombre del archivo pickle
-# agregar parametro  para resetear la busqueda
-# si uno ya tiene una busqueda en curso, me tendria que mostrar la cantidad de pub disponibles
-# es decir la que me informa menos los IDS descartados [esas serian las nuevas pubs]
+# TODO mejorar la salida de las opciones que quedan desalineadas.
+# TODO mostrar la cantidad de publicaciones en cada paso
