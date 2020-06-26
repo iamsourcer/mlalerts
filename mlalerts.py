@@ -3,9 +3,9 @@
 import json
 import math
 import pickle
-import requests
 import argparse
 import os
+import requests
 
 LIMIT = 50
 SEARCH_DIRECTORY = 'searches/'
@@ -56,14 +56,14 @@ def input_numero(prompt: str, maximo: int) -> int:
 
 def select_filters(q: str) -> dict:
     search = {
-       'query': q,
-       'filters': [],
-       'ids': set()
+        'query': q,
+        'filters': [],
+        'ids': set()
         }
 
     while True:
         i = 0
-        data  = __get(search)
+        data = __get(search)
         filtros = data['available_filters']
         total_results = data['paging']['total']
         print('Total listings:{}'.format(total_results))
@@ -94,7 +94,7 @@ def select_query() -> str:
     if not os.path.exists('searches'):
         os.mkdir('searches')
     saved_searches = os.listdir('searches')
-    if len(saved_searches) == 0 :
+    if len(saved_searches) == 0:
         print('No previous search done - Go back and query something using --query!')
         return None
     print('Wanna Go back to these ?? - Enter to EXIT\n')
@@ -117,8 +117,9 @@ def main(query):
     pickle_filename = SEARCH_DIRECTORY + pickle_filename
     search = load_search(pickle_filename)
     if search is  None:
-        search  = select_filters(query)
+        search = select_filters(query)
     # En este punto ya vamos a revisar las publicaciones
+    print('total listings:')
     data = __get(search)
     total_pages = math.ceil(data['paging']['total'] / LIMIT)
     i = 0
@@ -139,7 +140,7 @@ def main(query):
                 search['ids'].add(item['id'])
             i += 1
         if descartar.lower() == 'q':
-                break
+            break
     pickle.dump(search, open(pickle_filename, 'wb'))
 
 if __name__ == '__main__':
@@ -147,7 +148,7 @@ if __name__ == '__main__':
     my_parser = argparse.ArgumentParser()
     my_parser.add_argument('--query', '-q',
                            nargs='+',
-                           help= 'query search')
+                           help='query search')
     args = my_parser.parse_args()
     if args.query:
         query = ' '.join(args.query)
