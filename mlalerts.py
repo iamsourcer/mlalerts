@@ -11,17 +11,30 @@ import yagmail
 import config
 
 
-def load_search(filename: str):
-    filename = config.SEARCH_DIRECTORY + filename
+def load_search(query: str) -> dict:
+    filename = config.get('PICKLE_FILENAME')
     try:
-        return pickle.load(open(filename, 'rb'))
+        searches = pickle.load(open(filename, 'rb'))
+        return searches[query]
     except:
         return None
 
-def dump_search(filename: str, search: dict):
-    if not os.path.exists(config.SEARCH_DIRECTORY):
-        os.mkdir(config.SEARCH_DIRECTORY)
-    pickle.dump(search, open(config.SEARCH_DIRECTORY + filename, 'wb'))
+def load_searches() -> list:
+    filename = config.get('PICKLE_FILENAME')
+    try:
+        searches = pickle.load(open(filename, 'rb'))
+        return list(searches,values())
+    except:
+        return None
+
+def dump_search(search: dict):
+    filename = config.get('PICKLE_FILENAME')
+    try:
+        searches = pickle.load(open(filename, 'rb'))
+        searches[search['query']] = search
+    except:
+        searches = {search['query']: search}
+    pickle.dump(searches, open(config.get('PICKLE_FILENAME'), 'wb'))
 
 def __get(search, page=0):
     if isinstance(search, str):
@@ -92,33 +105,30 @@ def select_filters(q: str) -> dict:
     return search
 
 def select_query() -> str:
-    if not os.path.exists('searches'):
-        os.mkdir('searches')
-    saved_searches = os.listdir('searches')
-    if len(saved_searches) == 0:
+    filename = config.get('PICKLE_FILENAME')
+    searches = load_searches()
+    if len(searches) == 0:
         print('No previous search done - Go back and query something using --query!')
         return None
     while True:
         i = 0
-        for filename in saved_searches:
-            search = load_search(filename)
+        for search in searches:
             data = __get(search)
             pending_results = data['paging']['total'] - len(search['ids'])
             print('[{}] - {} - ({})'.format(i, search['query'], pending_results))
             i += 1
-        numero_valor = input_numero('>> ', len(saved_searches))
+        numero_valor = input_numero('>> ', len(searches))
 
         if numero_valor is None:
             sys.exit()
-        query = saved_searches[numero_valor].split('.')[0]
+        query = searches[numero_valor]['query']
         break
     return query
 
 def interactive_mode(query: str) -> None:
     if not query:
         query = select_query()
-    pickle_filename = query.replace(' ', '_') + '.pickle'
-    search = load_search(pickle_filename)
+    search = load_search(query)
     if search is  None:
         search = select_filters(query)
     # En este punto ya vamos a revisar las publicaciones
@@ -136,6 +146,7 @@ def interactive_mode(query: str) -> None:
             print()
             print(i, '.', item['title'])
             print('$', item['price'])
+            print('Link: ', item['permalink'])
             print()
             descartar = input('Descartar? [S/n] q to exit >> ')
             if descartar.lower() == 'q':
@@ -145,7 +156,7 @@ def interactive_mode(query: str) -> None:
             i += 1
         if descartar.lower() == 'q':
             break
-    dump_search(pickle_filename, search)
+    dump_search(search)
     return
 
 def send_mail(message: str) -> None:
@@ -161,23 +172,25 @@ def send_mail(message: str) -> None:
     return
 
 def alert_mode(query: str):
-    pickle_list = []
     email = config.get('EMAIL_USERNAME')
     password = config.get('EMAIL_PASS')
+    filename = config.get('PICKLE_FILENAME')
+    searches = pickle.load(open(filename, 'rb'))
+    active_searches = []
+
     if query:
-        pickle_filename = query.replace(' ', '_') + '.pickle'
-        if not os.path.exists(config.SEARCH_DIRECTORY + pickle_filename):
+        if not query in searches.keys():
             print('Invalid search:', query)
             return
-        pickle_list.append(pickle_filename)
+        active_searches.append(searches[query])
     else:
-        pickle_list = os.listdir(config.SEARCH_DIRECTORY)
+        active_searches = searches.values()
 
-    if len(pickle_list) == 0:
+    if len(active_searches) == 0:
         print('ERROR - No saved searches to alert you on... GO DO SOME SEARCH!')
         return
-    for pickle_filename in pickle_list:
-        search = load_search(pickle_filename)
+
+    for search in active_searches:
         data = __get(search)
         pending_results = data['paging']['total'] - len(search['ids'])
         if pending_results > 0:
@@ -188,25 +201,67 @@ def alert_mode(query: str):
         else:
             print('Nada nuevo para esta search')
 
-def del_query():
+def del_query(query):
+    ''' This function deletes a selected query'''
+
+    filename = config.get('PICKLE_FILENAME')
+    searches = pickle.load(open(filename, 'rb'))
+
     print('Choose file to delete - WARNING ACTION CAN\'T BE UNDONE')
-    pickle_filename = select_query() + '.pickle'
-    os.remove(config.SEARCH_DIRECTORY + pickle_filename)
-    print('Done!')
+    if query != '' :
+        print(query)
+        searches.pop(query, None)
+        dump_search(searches)
+        print('Done!')
+        return
+    while True:
+        i = 0
+        for search in searches:
+            print('[{}] - {}'.format(i, search))
+            i += 1
+
+        numero_valor = input_numero('>> ', len(searches))
+
+        if numero_valor is None:
+            sys.exit()
     return
 
+def reset_query(query: str):
+    ''' This function resets query filters '''
+
+    search = select_filters(query)
+    dump_search(search)
+    interactive_mode(query)
+
+
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == '-a':
+
+    opciones = {
+        'alert' : ['-a', '--alert', '-alert', '-alerts', '--alerts'],
+        'reset' : ['-r', '--reset', '-reset'],
+        'delete' : ['-d', '--delete', '-delete']
+    }
+
+    if len(sys.argv) > 1 and sys.argv[1] in opciones['alert']:
         query = ' '.join(sys.argv[2:]).lower()
         alert_mode(query)
-    elif len(sys.argv) > 1 and sys.argv[1] == '-d':
-        del_query()
+    elif len(sys.argv) > 1 and sys.argv[1] in opciones['delete']:
+        query = ' '.join(sys.argv[2:]).lower()
+        del_query(query)
+    elif len(sys.argv) > 1 and  sys.argv[1] in opciones['reset']:
+        query = ' '.join(sys.argv[2:]).lower()
+        reset_query(query)
     else:
         query = ' '.join(sys.argv[1:]).lower()
         interactive_mode(query)
 
 #TODO
 
-# tiene sentido usar archivos pickle distintos ??? PENSAR! LATIGO !!! LATIGO!!!
-# Me parece o creo que podriamos usar un diccionario que contenga las busquedas
-# puedo hacer con un archivo que contenga clave 'query': el dict de la busqueda
+# API para el pickle de las busquedas
+
+# GET api/searches?q=query para devolver una busqueda especifica
+# GET api/searches --> json con un array con cada busqueda
+# POST api/searches --> agrega una busqueda al pickle
+# DELETE api/searches --> borramos una buqueda
+# PUT api/searches --> updateamos una busqueda
+
