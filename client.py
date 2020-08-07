@@ -2,13 +2,10 @@
 
 import json
 import math
-import pickle
 import sys
-import os
-from os import path
 import requests
-import yagmail
 import config
+from background_jobs import alert_mode, __get
 
 
 def get_search(query: str) -> dict:
@@ -38,22 +35,6 @@ def create_search(search: dict):
    # vamos a tener que determinar si la busqueda YA existe o si es una busqueda nueva a dumpear y de ahi el metodo a usar
     requests.post(config.API_BASE_URL, data=json.dumps(search), headers=headers)
 
-def __get(search, page=0):
-    if isinstance(search, str):
-        q = search
-        filters = None
-    else:
-        q = search['query']
-        filters = search['filters']
-
-    offset = page * config.LIMIT
-    url = config.URL.format(q, offset)
-    if filters:
-        for d in filters:
-            url += '&{}={}'.format(d['filtro_id'], d['valor_id'])
-    response = requests.get(url)
-    data = json.loads(response.text)
-    return data
 
 def es_numero(string: str, maximo: int) -> bool:
     if not string.isdigit():
@@ -157,54 +138,12 @@ def interactive_mode(query: str) -> None:
             if descartar.lower() == 'q':
                 break
             if descartar.lower() != 'n':
-                search['ids'].add(item['id'])
+                search['ids'].append(item['id'])
             i += 1
         if descartar.lower() == 'q':
             break
     create_search(search) # vamos a utilizar server.py para hacer el dump
     return
-
-def send_mail(message: str) -> None:
-    ''' function used to send email alert '''
-
-    try:
-        yag = yagmail.SMTP(user=config.EMAIL_USERNAME, password=config.EMAIL_PASS)
-        yag.send(to=config.EMAIL_USERNAME,
-              subject='MLAlerts', contents=message)
-        print('Email Sent!')
-    except:
-        print('ERROR!, unvaible to send email, check username or password in config file')
-    return
-
-def alert_mode(query: str):
-    email = config.get('EMAIL_USERNAME')
-    password = config.get('EMAIL_PASS')
-    filename = config.get('PICKLE_FILENAME')
-    searches = pickle.load(open(filename, 'rb'))
-    active_searches = []
-
-    if query:
-        if not query in searches.keys():
-            print('Invalid search:', query)
-            return
-        active_searches.append(searches[query])
-    else:
-        active_searches = searches.values()
-
-    if len(active_searches) == 0:
-        print('ERROR - No saved searches to alert you on... GO DO SOME SEARCH!')
-        return
-
-    for search in active_searches:
-        data = __get(search)
-        pending_results = data['paging']['total'] - len(search['ids'])
-        if pending_results > 0:
-            print('Enviamos una ALERT - {} new results for {}'.format(
-                pending_results, search['query']))
-            message = 'Hay {} resultados nuevos para revisar para la busqueda "{}"'.format(pending_results, search['query'])
-            send_mail(message)
-        else:
-            print('Nada nuevo para esta search')
 
 def del_query(query: str) -> bool:
     ''' This function deletes a selected query'''
@@ -255,10 +194,6 @@ if  __name__ == '__main__':
         query = ' '.join(sys.argv[1:]).lower()
         interactive_mode(query)
 
-#TODO
 
-# mover alert_mode a un archivo separado que ahora se llama background_jobs.py
-# crear una ruta/endpoint en el servidor para manejar las alertas
-# hacer posible la llamada de alerts desde el client directamente con -a --alert
 
 

@@ -82,6 +82,10 @@ def add_search():
     dump_search(search)
     return jsonify(search), 201
 
+@app.route('/alerts', methods=['POST'])
+def send_alert():
+    pass
+
 if __name__ == '__main__':
     app.run(debug=True)
 
